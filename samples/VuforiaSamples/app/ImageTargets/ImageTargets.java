@@ -98,7 +98,20 @@ public class ImageTargets extends Activity implements SampleApplicationControl,
     {
         Log.d(LOGTAG, "onCreate");
         super.onCreate(savedInstanceState);
-        
+
+        this.hub = Hub.getInstance();
+        if (!hub.init(this, getPackageName())) {
+            // We can't do anything with the Myo device if the Hub can't be initialized, so exit.
+            Toast.makeText(this, "Couldn't initialize Hub", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+       
+        if (this.hub == Hub.getInstance()){
+            Toast.makeText(this, "Hub created!", Toast.LENGTH_SHORT).show();
+            this.hub.addListener(mListener);
+        } 
+
         vuforiaAppSession = new SampleApplicationSession(this);
         
         startLoadingAnimation();
@@ -118,6 +131,97 @@ public class ImageTargets extends Activity implements SampleApplicationControl,
             "droid");
         
     }
+
+        private DeviceListener mListener = new AbstractDeviceListener() {
+
+        private Arm mArm = Arm.UNKNOWN;
+        private XDirection mXDirection = XDirection.UNKNOWN;
+
+        // onConnect() is called whenever a Myo has been connected.
+        @Override
+        public void onConnect(Myo myo, long timestamp) {
+            Log.w("myo", "connected");
+        }
+
+        // onDisconnect() is called whenever a Myo has been disconnected.
+        @Override
+        public void onDisconnect(Myo myo, long timestamp) {
+            Log.w("myo", "DC");
+        }
+
+        // onArmRecognized() is called whenever Myo has recognized a setup gesture after someone has put it on their
+        // arm. This lets Myo know which arm it's on and which way it's facing.
+        @Override
+        public void onArmRecognized(Myo myo, long timestamp, Arm arm, XDirection xDirection) {
+            mArm = arm;
+            mXDirection = xDirection;
+        }
+
+        // onArmLost() is called whenever Myo has detected that it was moved from a stable position on a person's arm after
+        // it recognized the arm. Typically this happens when someone takes Myo off of their arm, but it can also happen
+        // when Myo is moved around on the arm.
+        @Override
+        public void onArmLost(Myo myo, long timestamp) {
+            mArm = Arm.UNKNOWN;
+            mXDirection = XDirection.UNKNOWN;
+        }
+
+        // onOrientationData() is called whenever a Myo provides its current orientation,
+        // represented as a quaternion.
+        @Override
+        public void onOrientationData(Myo myo, long timestamp, Quaternion rotation) {
+            // Calculate Euler angles (roll, pitch, and yaw) from the quaternion.
+            float roll = (float) Math.toDegrees(Quaternion.roll(rotation));
+            float pitch = (float) Math.toDegrees(Quaternion.pitch(rotation));
+            float yaw = (float) Math.toDegrees(Quaternion.yaw(rotation));
+
+            // Adjust roll and pitch for the orientation of the Myo on the arm.
+            if (mXDirection == XDirection.TOWARD_ELBOW) {
+                roll *= -1;
+                pitch *= -1;
+            }
+
+            // Next, we print roll, pitch, and yaw.
+            
+//            Log.w("myo", String.valueOf(roll));
+//            Log.w("myo", String.valueOf(pitch));
+//            Log.w("myo", String.valueOf(yaw));
+
+        }
+
+        // onPose() is called whenever a Myo provides a new pose.
+        @Override
+        public void onPose(Myo myo, long timestamp, Pose pose) {
+            int i = com.Variables.Triggers.myoState;
+            int n = com.Variables.Triggers.wrapMyoState;
+            switch (pose) {
+                case UNKNOWN:
+                    Log.w("myo", "unknown pose");
+                    break;
+                case REST:
+//                  Log.w("myo", "rest pose");
+                    break;
+                case FIST:
+                    Log.w("myo", "fist pose");                  
+                    break;
+                case WAVE_IN:
+                    Log.w("myo", "wave in pose");
+                    com.Variables.Triggers.myoState = (i - 1 + n) % n;
+                    break;
+                case WAVE_OUT:
+                    Log.w("myo", "wave out pose");
+                    com.Variables.Triggers.myoState = (i + 1 + n) % n;                  
+                    break;
+                case FINGERS_SPREAD:
+                    Log.w("myo", "fingers spread pose");
+                    break;
+                case THUMB_TO_PINKY:
+                    Log.w("myo", "ttp pose");
+                    
+                    break;
+            }
+        }
+    };
     
     // Process Single Tap event to trigger autofocus
     private class GestureListener extends
@@ -179,6 +283,12 @@ public class ImageTargets extends Activity implements SampleApplicationControl,
         Log.d(LOGTAG, "onResume");
         super.onResume();
         
+        // If Bluetooth is not enabled, request to turn it on.
+        if (!BluetoothAdapter.getDefaultAdapter().isEnabled()) {
+            Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+        }
+                
         // This is needed for some Droid devices to force portrait
         if (mIsDroidDevice)
         {
@@ -750,7 +860,27 @@ public class ImageTargets extends Activity implements SampleApplicationControl,
         return result;
     }
     
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        super.onCreateOptionsMenu(menu);
+        getMenuInflater().inflate(R.menu.main, menu);
+        return true;
+    }
     
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {        
+        if (item.getItemId() == 1) {
+            onScanActionSelected();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+    
+    private void onScanActionSelected() {
+        // Launch the ScanActivity to scan for Myos to connect to.
+        Intent intent = new Intent(this, ScanActivity.class);
+        startActivity(intent);
+    }
     private void showToast(String text)
     {
         Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
