@@ -1,8 +1,6 @@
 # Myourtual Reality
 
-Qualcomm - Best Use of Vuforia @ Boilermake 2014
-
-http://challengepost.com/software/myourtual-reality
+Qualcomm - Best Use of Vuforia @ Boilermake 2014 (http://challengepost.com/software/myourtual-reality)
 
 ## Overview
 
